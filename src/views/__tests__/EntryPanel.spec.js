@@ -5,6 +5,10 @@ import EntryPanel from '../EntryPanel.vue'
 import { useHeimdallStore } from '../../stores/heimdall'
 import { createRouter, createWebHistory } from 'vue-router'
 
+vi.mock('../../utils/audio', () => ({
+  playUrgentBeep: vi.fn()
+}))
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [{ path: '/', name: 'Start', component: { template: '<div>Start</div>' } }]
