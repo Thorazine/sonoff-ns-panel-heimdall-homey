@@ -6,7 +6,9 @@ import { useHeimdallStore } from '../../stores/heimdall'
 import { createRouter, createWebHistory } from 'vue-router'
 
 vi.mock('../../utils/audio', () => ({
-  playUrgentBeep: vi.fn()
+  playUrgentBeep: vi.fn(),
+  playErrorSound: vi.fn(),
+  playDisarmedSound: vi.fn()
 }))
 
 const router = createRouter({

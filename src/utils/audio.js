@@ -74,3 +74,47 @@ export function playUrgentBeep() {
   oscillator.start();
   oscillator.stop(audioCtx.currentTime + 0.15);
 }
+
+export function playErrorSound() {
+  initAudio();
+  if (!audioCtx) return;
+
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.type = 'sawtooth';
+  // Low buzzer sound
+  oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); 
+  oscillator.frequency.setValueAtTime(100, audioCtx.currentTime + 0.2); 
+
+  gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  oscillator.start();
+  oscillator.stop(audioCtx.currentTime + 0.4);
+}
+
+export function playDisarmedSound() {
+  initAudio();
+  if (!audioCtx) return;
+
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.type = 'sine';
+  // Pleasant ascending double beep
+  oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+  oscillator.frequency.setValueAtTime(800, audioCtx.currentTime + 0.15);
+
+  gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  oscillator.start();
+  oscillator.stop(audioCtx.currentTime + 0.4);
+}

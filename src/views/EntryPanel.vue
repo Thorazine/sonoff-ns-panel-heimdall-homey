@@ -7,7 +7,25 @@
       class="absolute inset-0 border-8 border-red-600 animate-pulse pointer-events-none z-50"
     ></div>
     
-    <div v-if="!disarmed" class="w-full flex flex-col items-center justify-start relative z-10 h-full pt-6">
+    <!-- Lockout Screen -->
+    <div v-if="isLockedOut" class="flex flex-col items-center justify-center animate-fade-in z-20 h-full">
+      <svg class="w-32 h-32 text-red-500 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+      </svg>
+      <h1 class="text-3xl text-red-500 font-bold tracking-widest mb-2">GEBLOKKEERD</h1>
+      <p class="text-2xl text-gray-300 font-bold">Probeer opnieuw in {{ lockoutTimeLeft }}s</p>
+    </div>
+
+    <!-- Success Screen -->
+    <div v-else-if="disarmed" class="flex flex-col items-center justify-center animate-fade-in z-20 h-full">
+      <svg class="w-32 h-32 text-flashy mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <h1 class="text-3xl text-flashy font-bold tracking-widest text-shadow-flashy">GEDEACTIVEERD</h1>
+    </div>
+
+    <!-- Main Entry Panel -->
+    <div v-else class="w-full flex flex-col items-center justify-start relative z-10 h-full pt-6">
       <!-- Alarm Countdown Timer -->
       <div v-if="alarmMode" class="text-center mb-4">
         <h2 class="text-xl text-red-500 font-bold tracking-widest mb-1">
@@ -77,13 +95,12 @@
         </button>
       </div>
     </div>
-
-    <!-- Success Screen -->
-    <div v-else class="flex flex-col items-center justify-center animate-fade-in z-20 h-full">
-      <svg class="w-32 h-32 text-flashy mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    <!-- Error Screen -->
+    <div v-if="showErrorScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-red-950/90 z-30 animate-fade-in">
+      <svg class="w-32 h-32 text-red-500 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
       </svg>
-      <h1 class="text-3xl text-flashy font-bold tracking-widest text-shadow-flashy">GEDEACTIVEERD</h1>
+      <h1 class="text-3xl text-red-500 font-bold tracking-widest">FOUTIEVE CODE</h1>
     </div>
 
   </div>
@@ -93,7 +110,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useHeimdallStore } from '../stores/heimdall'
-import { playUrgentBeep } from '../utils/audio'
+import { playUrgentBeep, playErrorSound, playDisarmedSound } from '../utils/audio'
 
 const router = useRouter()
 const route = useRoute()
@@ -102,6 +119,13 @@ const store = useHeimdallStore()
 const pin = ref('')
 const errorMsg = ref('')
 const loading = ref(false)
+const showErrorScreen = ref(false)
+
+// Lockout logic
+const failedAttempts = ref(0)
+const isLockedOut = ref(false)
+const lockoutTimeLeft = ref(0)
+let lockoutTimer = null
 
 // Alarm push logic
 const alarmMode = route.query.alarm === 'true'
@@ -109,6 +133,20 @@ const alarmTimeLeft = ref(10)
 const isFlashing = ref(false)
 const disarmed = ref(false)
 let alarmTimer = null
+
+const startLockoutTimer = () => {
+  if (lockoutTimer) clearTimeout(lockoutTimer)
+  lockoutTimer = setTimeout(() => {
+    if (lockoutTimeLeft.value > 0) {
+      lockoutTimeLeft.value--
+      startLockoutTimer()
+    } else {
+      isLockedOut.value = false
+      failedAttempts.value = 0
+      pin.value = ''
+    }
+  }, 1000)
+}
 
 const append = (num) => {
   if (pin.value.length < 6) {
@@ -131,6 +169,8 @@ const submit = async () => {
   loading.value = false
 
   if (success) {
+    failedAttempts.value = 0
+    playDisarmedSound()
     if (alarmTimer) clearTimeout(alarmTimer)
     isFlashing.value = false
     disarmed.value = true
@@ -138,13 +178,27 @@ const submit = async () => {
       router.push('/')
     }, 2000)
   } else {
-    errorMsg.value = store.error || 'FOUTIEVE CODE'
-    pin.value = ''
+    failedAttempts.value++
+    playErrorSound()
+    
+    if (failedAttempts.value >= 5) {
+      isLockedOut.value = true
+      lockoutTimeLeft.value = 60
+      showErrorScreen.value = false
+      startLockoutTimer()
+    } else {
+      showErrorScreen.value = true
+      setTimeout(() => {
+        showErrorScreen.value = false
+        pin.value = ''
+      }, 1000)
+    }
   }
 }
 
 const cancelToStart = () => {
   if (alarmTimer) clearTimeout(alarmTimer)
+  if (lockoutTimer) clearTimeout(lockoutTimer)
   router.push('/')
 }
 

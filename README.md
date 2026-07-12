@@ -10,6 +10,7 @@ A sleek, dark-themed, kiosk-optimized web application designed to run on the Son
 - **Audio Feedback**: Uses the Web Audio API for native countdown beeps and activation sounds without loading external mp3s.
 - **Alarm Push Trigger**: Capable of displaying an urgent, flashing red countdown timer when triggered by Homey.
 - **Auto-Sleep**: Automatically returns to a black screensaver after 30 seconds of inactivity.
+- **Secure Backend**: Uses a robust PHP proxy backend to securely store API keys and validate PIN codes server-side, protecting your Homey environment from client-side manipulation.
 
 ---
 
@@ -47,23 +48,25 @@ If you want the NS Panel to automatically pop up with a flashing red countdown w
    npm install
    ```
 3. Configure your Environment Variables:
-   Open the `.env` file (create one if it doesn't exist) and add your Homey IP and the API Key you generated:
+   Open the `.env` file (create one based on `.env.example`) and add your Homey IP, API Key, and PIN codes:
    ```env
-   VITE_HOMEY_BASE_URL=http://<YOUR_HOMEY_IP>
-   VITE_HOMEY_API_KEY=<YOUR_HOMEY_API_KEY>
+   HOMEY_BASE_URL=http://<YOUR_HOMEY_IP>
+   HOMEY_API_KEY=<YOUR_HOMEY_API_KEY>
+   ALLOWED_PINS=1234,0000
    
    # Optional: Default seconds for the normal arming countdown
    VITE_COUNTDOWN_SECONDS=10
    ```
-4. Start the development server (make sure to use `--host` so the NS Panel can access it):
+4. Build for deployment:
    ```bash
-   npm run dev -- --host
+   npm run build:deploy
    ```
+   This command creates a `deploy/` directory containing your `.env` file and a `public/` directory with the frontend code and `api.php`. Copy the contents of `deploy/public/` directly to your PHP web server's document root.
 
 ## 📱 Running on the NS Panel
 1. Open **Fully Kiosk Browser** on your Sonoff NS Panel Pro.
-2. Set the Start URL to: `http://<IP-OF-YOUR-SERVER>:5173`
-3. Enjoy your new modern Heimdall dashboard!
+2. Set the Start URL to your web server's address (e.g. `http://<IP-OF-YOUR-SERVER>:8010/`).
+3. Enjoy your modern, secure Heimdall dashboard!
 
 ## 🧪 Testing
 The application includes unit tests for the core logic and routing.

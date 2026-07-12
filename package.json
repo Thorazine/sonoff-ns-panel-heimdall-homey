@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:deploy": "vite build && rm -rf deploy && mkdir -p deploy/public && cp -r dist/* deploy/public/ && cp .env deploy/public/",
     "preview": "vite preview",
     "test": "vitest run"
   },
