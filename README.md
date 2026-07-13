@@ -40,6 +40,14 @@ If you want the NS Panel to automatically pop up with a flashing red countdown w
 
 ---
 
+## 💻 Requirements
+
+To host the Heimdall UI securely, your web server must support:
+- **PHP 8.0** or higher
+- The PHP server must allow `file_get_contents()` for external networking (cURL is not required).
+
+---
+
 ## 💻 Installation & Setup
 
 1. Clone or download this repository.
