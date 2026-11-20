@@ -40,7 +40,7 @@ case "$ROLE" in
         ;;
     reverb)
         while true; do
-            if php artisan list --raw 2>/dev/null | grep -q '^reverb:start'; then
+            if [ -f vendor/laravel/reverb/composer.json ]; then
                 echo "[reverb] Laravel Reverb starten op 0.0.0.0:${REVERB_SERVER_PORT:-8080}..."
                 php artisan reverb:start --host=0.0.0.0 --port="${REVERB_SERVER_PORT:-8080}" --no-interaction || true
                 sleep 3
