@@ -1,83 +1,64 @@
-# Sonoff NS Panel Pro - Heimdall UI
+# Sonoff NS Panel Pro — Heimdall UI (Laravel 13 + Filament v5)
 
-A sleek, dark-themed, kiosk-optimized web application designed to run on the Sonoff NS Panel Pro (or any browser) to control the **Heimdall** alarm system on a Homey Pro. 
-
-![Heimdall UI](https://github.com/danee-de-kruyff/com.uc.heimdall/raw/master/assets/images/large.png) *(Note: Placeholder image for Heimdall)*
+Een donkere, kiosk-geoptimaliseerde webapplicatie (480×480) voor de **Sonoff NS Panel Pro** (of iedere browser) om het **Heimdall** alarmsysteem en bijbehorende flows op een **Homey Pro** te bedienen — volledig gebouwd op **Laravel 13**, **Filament v5**, **Livewire v4**, **Alpine.js** en **Tailwind CSS v4**.
 
 ## ✨ Features
-- **Kiosk Optimized**: Hardcoded for 480x480 resolution (perfect for NS Panel Pro).
-- **Direct Integration**: Talks directly to the Homey Device API locally (no cloud delays).
-- **Audio Feedback**: Uses the Web Audio API for native countdown beeps and activation sounds without loading external mp3s.
-- **Alarm Push Trigger**: Capable of displaying an urgent, flashing red countdown timer when triggered by Homey.
-- **Auto-Sleep**: Automatically returns to a black screensaver after 30 seconds of inactivity.
-- **Secure Backend**: Uses a robust PHP proxy backend to securely store API keys and validate PIN codes server-side, protecting your Homey environment from client-side manipulation.
+- **Kiosk Frontend (TALL Stack)**: Geoptimaliseerd op `480×480` resolutie met 0ms touch-respons (Alpine.js), 30s auto-sleep screensaver, Web Audio API countdown-beeps en ambient weer-, vorst- (*Krabben*), Buienradar- (*Paraplu*) en afvalwijzer-kaarten (*Kliko's*).
+- **Filament v5 Admin Paneel (`/admin`)**: Volledig beheer van gehashte gebruikers-PIN's (`bcrypt`), versleutelde Homey API-sleutels (`AES-256-CBC`), Homey Flow-koppelingen, live sensorstatus met batterijpercentages en activiteitenlogboek.
+- **Server-Side Beveiliging**: Gehashte PIN-verificatie, sessie-geautoriseerde uitloopvertraging en server-side rate-limiting (`PinLockoutService`) tegen brute-force pogingen.
+- **Alarm Push Trigger**: Ondersteunt directe push-activering vanuit een Homey Flow via Fully Kiosk Browser (`/entry?alarm=true`) met urgente rode countdown en knipperende alarmrand.
 
 ---
 
-## 🛠️ Homey Pro Configuration (Required)
-
-Before starting the application, you must configure Homey and Heimdall to allow external API communication.
-
-### 1. Add the Surveillance Device
-This UI does not talk to the Heimdall app directly. Instead, it interacts with the **Surveillance Mode Switch** virtual device.
-1. Open the Homey app.
-2. Go to **Devices** -> **+** -> **Heimdall**.
-3. Add the **Surveillance Mode Switch** device.
-
-### 2. Generate an API Key
-You need a Local API key with proper scopes to allow the panel to read and write to the Surveillance device.
-1. Go to the [Homey Developer Tools](https://tools.developer.homey.app/tools/api-keys).
-2. Create a new API Key. **Important:** Ensure the key has full `homey` access or at least `homey.device` and `homey.app` scopes.
-3. Copy the Bearer Token.
-
-### 3. Setting up the Alarm Trigger Push (Fully Kiosk Browser)
-If you want the NS Panel to automatically pop up with a flashing red countdown when the alarm is triggered, you must create a Flow in Homey.
-1. Ensure your NS Panel is running **Fully Kiosk Browser** and the REST API is enabled in its settings.
-2. **Create a Flow in Homey:**
-   - **WHEN**: Heimdall status changes to `Alarm` (or Pre-alarm delay starts).
-   - **THEN**: Make a Webhook/HTTP GET request to Fully Kiosk Browser to load the specific URL:
-     `http://<IP-OF-NSPANEL>:2365/?cmd=loadURL&url=http://<IP-OF-SERVER>:5173/entry?alarm=true&password=<FULLY_KIOSK_PASSWORD>`
+## 💻 Systeemvereisten
+- **PHP 8.3** of hoger (inclusief `pdo_mysql`, `redis` en `intl`)
+- **MySQL 8.0+** (lokaal en op de server)
+- **Redis** (op de server voor caching & rate-limiting; lokaal draait cache via `array`)
+- **Composer 2.x**
+- **Node.js 22+** & **npm** (voor Vite + Tailwind CSS v4 compilatie)
 
 ---
 
-## 💻 Requirements
+## 🛠️ Installatie & Configuratie
 
-To host the Heimdall UI securely, your web server must support:
-- **PHP 8.0** or higher
-- The PHP server must allow `file_get_contents()` for external networking (cURL is not required).
-
----
-
-## 💻 Installation & Setup
-
-1. Clone or download this repository.
-2. Install dependencies:
+1. **Installeer PHP- en frontend-dependencies:**
    ```bash
+   composer install
    npm install
    ```
-3. Configure your Environment Variables:
-   Open the `.env` file (create one based on `.env.example`) and add your Homey IP, API Key, and PIN codes:
-   ```env
-   HOMEY_BASE_URL=http://<YOUR_HOMEY_IP>
-   HOMEY_API_KEY=<YOUR_HOMEY_API_KEY>
-   ALLOWED_PINS=1234,0000
-   
-   # Optional: Default seconds for the normal arming countdown
-   VITE_COUNTDOWN_SECONDS=10
-   ```
-4. Build for deployment:
+
+2. **Configureer je `.env` bestand:**
    ```bash
-   npm run build:deploy
+   cp .env.example .env
+   php artisan key:generate
    ```
-   This command creates a `deploy/` directory containing your `.env` file and a `public/` directory with the frontend code and `api.php`. Copy the contents of `deploy/public/` directly to your PHP web server's document root.
+   Stel je MySQL-connectie in (`DB_DATABASE=sonoff_ns_panel_heimdall_homey`) en gebruik lokaal `CACHE_STORE=array` en op productie `CACHE_STORE=redis`. Alle applicatie-instellingen (Homey URL, versleutelde API-key, Flows, timers en gehashte PIN-codes met optioneel `is_admin`-vinkje) worden **volledig in MySQL** opgeslagen en met je beheerder-PIN ontgrendeld op `/admin`.
 
-## 📱 Running on the NS Panel
-1. Open **Fully Kiosk Browser** on your Sonoff NS Panel Pro.
-2. Set the Start URL to your web server's address (e.g. `http://<IP-OF-YOUR-SERVER>:8010/`).
-3. Enjoy your modern, secure Heimdall dashboard!
+3. **Voer de MySQL-migraties en seeder uit:**
+   ```bash
+   php artisan migrate --seed
+   ```
 
-## 🧪 Testing
-The application includes unit tests for the core logic and routing.
+4. **Compileer de frontend-assets:**
+   ```bash
+   npm run build
+   ```
+
+5. **Start de applicatie:**
+   ```bash
+   php artisan serve --host=0.0.0.0 --port=8000
+   ```
+   - **Kiosk Scherm (NS Panel Pro):** `http://<SERVER-IP>:8000/`
+   - **Filament Beheerpaneel:** `http://<SERVER-IP>:8000/admin`
+   - **Fully Kiosk Alarm Trigger URL:** `http://<SERVER-IP>:8000/entry?alarm=true`
+
+---
+
+## 🧪 Testen & Codekwaliteit
+
+De applicatie beschikt over een volledige **Pest v4** testsuite (Unit, Feature, Livewire Kiosk & Filament v5 Admin tests):
+
 ```bash
-npm run test
+php artisan test
+./vendor/bin/pint --test
 ```
