@@ -46,6 +46,7 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && sed -i "s/^group = .*/group = ${APP_GROUP}/" /usr/local/etc/php-fpm.d/www.conf \
     && mkdir -p /var/www/.composer /var/www/.npm /var/www/.ssh /var/www/html \
     && git config --system --add safe.directory /var/www/html \
+    && git config --system core.fileMode false \
     && chown -R "${APP_UID}:${APP_GID}" /var/www
 
 COPY docker/nas/php/php.ini /usr/local/etc/php/conf.d/99-nas.ini

@@ -49,6 +49,7 @@ EOF
 fi
 
 mkdir -p storage/logs storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache
+git config core.fileMode false || true
 
 if [ -f .env ] && ! grep -Eq '^APP_KEY=[^[:space:]]+' .env; then
     log "APP_KEY ontbrak in .env — nieuwe sleutel genereren..."
