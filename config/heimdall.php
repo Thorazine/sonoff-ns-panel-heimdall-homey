@@ -3,15 +3,13 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Initial Seeder Account (alleen gebruikt door DatabaseSeeder)
+    | Heimdall Kiosk Configuratie
     |--------------------------------------------------------------------------
     |
     | Alle applicatie-instellingen (Homey URL, versleutelde API-key, Flows,
-    | timers, weerlocatie) en PIN-codes worden uitsluitend in de database
-    | opgeslagen en beheerd via het Filament Admin Panel (/admin).
+    | timers, weerlocatie) en gebruikers/PIN-codes worden uitsluitend in de
+    | database opgeslagen en beheerd via het Filament Admin Panel (/admin).
+    | Bij een schone installatie wordt het eerste account aangemaakt op /admin/setup.
     |
     */
-    'admin_name' => env('FILAMENT_ADMIN_NAME', 'Heimdall Beheerder'),
-    'admin_email' => env('FILAMENT_ADMIN_EMAIL', 'admin@heimdall.local'),
-    'admin_password' => env('FILAMENT_ADMIN_PASSWORD', 'heimdall-admin'),
 ];

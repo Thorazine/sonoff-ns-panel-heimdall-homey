@@ -127,11 +127,39 @@ class InitialAdminSetup extends BaseRegister
                 return null;
             }
 
+            $cleanName = trim((string) $data['name']);
+            $cleanEmail = strtolower(trim((string) $data['email']));
+            $cleanPin = filled($data['pin'] ?? null) ? trim((string) $data['pin']) : null;
+
+            /** @var User|null $existingPanelUser */
+            $existingPanelUser = User::query()
+                ->whereNull('email')
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($cleanName)])
+                ->first();
+
+            if ($existingPanelUser !== null) {
+                $attributes = [
+                    'name' => $cleanName,
+                    'email' => $cleanEmail,
+                    'password' => (string) $data['password'],
+                    'is_active' => true,
+                    'is_admin' => true,
+                ];
+
+                if ($cleanPin !== null) {
+                    $attributes['pin'] = $cleanPin;
+                }
+
+                $existingPanelUser->update($attributes);
+
+                return $existingPanelUser->fresh();
+            }
+
             return User::query()->create([
-                'name' => trim((string) $data['name']),
-                'email' => strtolower(trim((string) $data['email'])),
+                'name' => $cleanName,
+                'email' => $cleanEmail,
                 'password' => (string) $data['password'],
-                'pin' => filled($data['pin'] ?? null) ? trim((string) $data['pin']) : null,
+                'pin' => $cleanPin,
                 'is_active' => true,
                 'is_admin' => true,
             ]);
