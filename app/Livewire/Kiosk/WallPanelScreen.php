@@ -5,9 +5,9 @@ namespace App\Livewire\Kiosk;
 use App\Enums\KioskModule;
 use App\Enums\MenuBlockType;
 use App\Models\KioskMenu;
-use App\Models\PinCode;
 use App\Models\ReolinkCamera;
 use App\Models\Setting;
+use App\Models\User;
 use App\Models\WallPanel;
 use App\Services\DoorbellService;
 use App\Services\HomeyService;
@@ -505,7 +505,7 @@ class WallPanelScreen extends Component
             return;
         }
 
-        $verified = PinCode::verify($pin);
+        $verified = User::verifyPin($pin);
 
         if ($verified === null) {
             $failure = $lockout->recordFailure(contextLabel: "wandpaneel ({$this->wallPanel->name})");

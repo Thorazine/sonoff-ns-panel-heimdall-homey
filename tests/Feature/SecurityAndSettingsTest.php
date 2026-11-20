@@ -1,34 +1,30 @@
 <?php
 
-use App\Models\PinCode;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\PinLockoutService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
-test('T21: stores PIN codes hashed with bcrypt, ignores inactive PINs, and updates last_used_at', function (): void {
-    $active = PinCode::query()->create([
+test('T21: stores user PIN codes hashed with bcrypt, ignores inactive users, and updates pin_last_used_at', function (): void {
+    $active = User::factory()->panelOnly('2468')->create([
         'name' => 'Bewoner',
-        'pin' => '2468',
-        'is_active' => true,
     ]);
 
-    $inactive = PinCode::query()->create([
+    User::factory()->panelOnly('9999')->inactive()->create([
         'name' => 'Uitgeschakelde Gast',
-        'pin' => '9999',
-        'is_active' => false,
     ]);
 
     expect($active->pin_hash)->not->toBe('2468')
         ->and(Hash::check('2468', $active->pin_hash))->toBeTrue()
-        ->and(PinCode::verify('9999'))->toBeNull()
-        ->and(PinCode::verify('0000'))->toBeNull();
+        ->and(User::verifyPin('9999'))->toBeNull()
+        ->and(User::verifyPin('0000'))->toBeNull();
 
-    $matched = PinCode::verify('2468');
+    $matched = User::verifyPin('2468');
     expect($matched)->not->toBeNull()
         ->and($matched->id)->toBe($active->id)
-        ->and($matched->fresh()->last_used_at)->not->toBeNull();
+        ->and($matched->fresh()->pin_last_used_at)->not->toBeNull();
 });
 
 test('T22: encrypts homey_api_key at rest in MySQL and invalidates cache on update', function (): void {

@@ -3,7 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Enums\AlarmMode;
-use App\Models\PinCode;
+use App\Models\User;
 use App\Services\HomeyService;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -23,7 +23,18 @@ class HeimdallOverviewWidget extends StatsOverviewWidget
         $alarmEnum = $statusRaw !== null ? AlarmMode::tryFrom($statusRaw) : null;
 
         $openSensors = $configured ? count($homey->getOpenSensors()) : 0;
-        $activePins = PinCode::query()->where('is_active', true)->count();
+        $activePinUsers = User::query()
+            ->where('is_active', true)
+            ->whereNotNull('pin_hash')
+            ->where('pin_hash', '!=', '')
+            ->count();
+        $activeAdmins = User::query()
+            ->where('is_active', true)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->whereNotNull('password')
+            ->where('password', '!=', '')
+            ->count();
 
         return [
             Stat::make(
@@ -37,8 +48,8 @@ class HeimdallOverviewWidget extends StatsOverviewWidget
                 ->description($openSensors === 0 ? 'Alle ramen & deuren gesloten' : 'Aandacht vereist')
                 ->color($openSensors === 0 ? 'success' : 'danger'),
 
-            Stat::make('Actieve PIN-codes', (string) $activePins)
-                ->description('Geautoriseerd op het wandpaneel')
+            Stat::make('Actieve Gebruikers (PIN)', (string) $activePinUsers)
+                ->description("Waarvan {$activeAdmins} beheerder(s) op /admin")
                 ->color('info'),
         ];
     }

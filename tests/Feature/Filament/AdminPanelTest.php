@@ -1,17 +1,19 @@
 <?php
 
 use App\Enums\LogLevel;
-use App\Filament\Pages\Auth\PinLogin;
+use App\Filament\Pages\Auth\AdminLogin;
+use App\Filament\Pages\Auth\InitialAdminSetup;
 use App\Filament\Pages\ManageSettings;
 use App\Filament\Pages\SensorsOverview;
 use App\Filament\Resources\ActivityLogs\Pages\ManageActivityLogs;
-use App\Filament\Resources\PinCodes\Pages\CreatePinCode;
-use App\Filament\Resources\PinCodes\Pages\ListPinCodes;
+use App\Filament\Resources\Users\Pages\CreateUser;
+use App\Filament\Resources\Users\Pages\EditUser;
+use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Livewire\Kiosk\HubScreen;
 use App\Models\ActivityLog;
-use App\Models\PinCode;
 use App\Models\Setting;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Vite;
@@ -22,6 +24,9 @@ beforeEach(function (): void {
     $this->admin = User::factory()->create([
         'name' => 'Heimdall Beheerder',
         'email' => 'admin@heimdall.local',
+        'password' => 'heimdall-admin',
+        'is_active' => true,
+        'is_admin' => true,
     ]);
 
     Setting::setMany([
@@ -47,55 +52,133 @@ test('T35: unauthenticated guests are redirected to /admin/login and authenticat
     $this->actingAs($this->admin)
         ->get('/admin')
         ->assertOk()
-        ->assertSee('Heimdall Beheer');
+        ->assertSee('Heimdall Beheer')
+        ->assertSee('Gebruikers')
+        ->assertDontSee('PIN-codes');
 });
 
-test('T36: PinCodeResource lists PIN codes and creates a new bcrypt-hashed PIN code', function (): void {
-    $existing = PinCode::query()->create([
-        'name' => 'Standaard PIN',
-        'pin' => '1234',
-        'is_active' => true,
+test('T36: UserResource lists users and manages both panel-only PIN users (without email) and /admin users (with email)', function (): void {
+    $existingResident = User::factory()->panelOnly('1234')->create([
+        'name' => 'Bewoner',
     ]);
 
     $this->actingAs($this->admin);
 
-    Livewire::test(ListPinCodes::class)
-        ->assertCanSeeTableRecords([$existing]);
+    Livewire::test(ListUsers::class)
+        ->assertCanSeeTableRecords([$this->admin, $existingResident]);
 
-    Livewire::test(CreatePinCode::class)
+    // 1. Create a user with ONLY name + PIN (no email or password needed -> alarm only)
+    Livewire::test(CreateUser::class)
         ->fillForm([
             'name' => 'Schoonmaak',
-            'pin' => '567890',
             'is_active' => true,
+            'pin' => '567890',
         ])
         ->call('create')
         ->assertHasNoFormErrors();
 
-    $created = PinCode::query()->where('name', 'Schoonmaak')->first();
-    expect($created)->not->toBeNull()
-        ->and(Hash::check('567890', $created->pin_hash))->toBeTrue();
+    $cleaner = User::query()->where('name', 'Schoonmaak')->first();
+    expect($cleaner)->not->toBeNull()
+        ->and($cleaner->email)->toBeNull()
+        ->and($cleaner->hasAdminAccess())->toBeFalse()
+        ->and(Hash::check('567890', $cleaner->pin_hash))->toBeTrue();
+
+    // 2. Create a user with email + password AND PIN -> automatically gets /admin access
+    Livewire::test(CreateUser::class)
+        ->fillForm([
+            'name' => 'Tweede Beheerder',
+            'is_active' => true,
+            'pin' => '4321',
+            'email' => 'beheer2@heimdall.local',
+            'password' => 'wachtwoord123',
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $secondAdmin = User::query()->where('email', 'beheer2@heimdall.local')->first();
+    expect($secondAdmin)->not->toBeNull()
+        ->and($secondAdmin->hasAdminAccess())->toBeTrue()
+        ->and($secondAdmin->is_admin)->toBeTrue()
+        ->and(Hash::check('wachtwoord123', $secondAdmin->password))->toBeTrue()
+        ->and(Hash::check('4321', $secondAdmin->pin_hash))->toBeTrue();
+
+    // 3. Edit user name while leaving PIN and password blank preserves existing hashes
+    Livewire::test(EditUser::class, ['record' => $secondAdmin->getRouteKey()])
+        ->fillForm([
+            'name' => 'Tweede Beheerder Bijgewerkt',
+            'pin' => '',
+            'password' => '',
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $secondAdmin->refresh();
+    expect($secondAdmin->name)->toBe('Tweede Beheerder Bijgewerkt')
+        ->and(Hash::check('wachtwoord123', $secondAdmin->password))->toBeTrue()
+        ->and(Hash::check('4321', $secondAdmin->pin_hash))->toBeTrue();
+
+    // 4. Clearing email revokes /admin access while keeping their panel PIN active
+    Livewire::test(EditUser::class, ['record' => $secondAdmin->getRouteKey()])
+        ->fillForm([
+            'email' => '',
+            'pin' => '',
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $secondAdmin->refresh();
+    expect($secondAdmin->email)->toBeNull()
+        ->and($secondAdmin->hasAdminAccess())->toBeFalse()
+        ->and(Hash::check('4321', $secondAdmin->pin_hash))->toBeTrue();
 });
 
-test('T37: PinCodeResource rejects invalid non-numeric PINs and prevents deleting or deactivating the last active PIN', function (): void {
-    $onlyPin = PinCode::query()->create([
-        'name' => 'Enige PIN',
-        'pin' => '1234',
-        'is_active' => true,
+test('T37: UserResource requires PIN when email is empty, requires password when email is given, and protects last PIN/admin', function (): void {
+    $onlyPinUser = User::factory()->panelOnly('1234')->create([
+        'name' => 'Enige PIN Gebruiker',
     ]);
 
     $this->actingAs($this->admin);
 
-    Livewire::test(CreatePinCode::class)
+    // Invalid non-numeric PIN rejected
+    Livewire::test(CreateUser::class)
         ->fillForm([
             'name' => 'Ongeldig',
-            'pin' => '12ab',
             'is_active' => true,
+            'pin' => '12ab',
         ])
         ->call('create')
         ->assertHasFormErrors(['pin']);
 
-    expect(fn () => $onlyPin->delete())->toThrow(ValidationException::class);
-    expect(fn () => $onlyPin->update(['is_active' => false]))->toThrow(ValidationException::class);
+    // Neither PIN nor email filled -> PIN required
+    Livewire::test(CreateUser::class)
+        ->fillForm([
+            'name' => 'Leeg',
+            'is_active' => true,
+            'pin' => '',
+            'email' => '',
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['pin']);
+
+    // Email filled without password -> password required
+    Livewire::test(CreateUser::class)
+        ->fillForm([
+            'name' => 'Zonder Wachtwoord',
+            'is_active' => true,
+            'email' => 'nieuw@heimdall.local',
+            'password' => '',
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['password']);
+
+    // Last active PIN user cannot be deleted or deactivated
+    expect(fn () => $onlyPinUser->delete())->toThrow(ValidationException::class);
+    expect(fn () => $onlyPinUser->update(['is_active' => false]))->toThrow(ValidationException::class);
+
+    // Last active admin user cannot be deleted, deactivated, or have email cleared
+    expect(fn () => $this->admin->delete())->toThrow(ValidationException::class);
+    expect(fn () => $this->admin->update(['is_active' => false]))->toThrow(ValidationException::class);
+    expect(fn () => $this->admin->update(['email' => null]))->toThrow(ValidationException::class);
 });
 
 test('T38: ManageSettings Filament page loads and saves Homey URL, API key, and weather settings', function (): void {
@@ -196,87 +279,83 @@ test('T42: Vite manifest exists and all Kiosk HTTP routes render compiled assets
     }
 });
 
-test('T43: PinLogin (/admin/login) authenticates only PIN codes with is_admin enabled', function (): void {
-    PinCode::query()->create([
-        'name' => 'Gast PIN',
-        'pin' => '1111',
-        'is_active' => true,
-        'is_admin' => false,
+test('T43: AdminLogin (/admin/login) authenticates only active users with email and password', function (): void {
+    User::factory()->panelOnly('1111')->create([
+        'name' => 'Alleen PIN Gebruiker',
     ]);
 
-    PinCode::query()->create([
-        'name' => 'Beheerder PIN',
-        'pin' => '2222',
-        'is_active' => true,
-        'is_admin' => true,
+    User::factory()->create([
+        'name' => 'Inactieve Admin',
+        'email' => 'inactief@heimdall.local',
+        'password' => 'wachtwoord123',
+        'is_active' => false,
     ]);
 
-    Livewire::test(PinLogin::class)
-        ->fillForm(['pin' => '9999'])
+    // Wrong password rejected
+    Livewire::test(AdminLogin::class)
+        ->fillForm([
+            'email' => 'admin@heimdall.local',
+            'password' => 'fout-wachtwoord',
+        ])
         ->call('authenticate')
-        ->assertHasFormErrors(['pin']);
+        ->assertHasFormErrors(['email']);
 
     expect(auth()->check())->toBeFalse();
 
-    Livewire::test(PinLogin::class)
-        ->fillForm(['pin' => '1111'])
+    // Inactive admin user rejected
+    Livewire::test(AdminLogin::class)
+        ->fillForm([
+            'email' => 'inactief@heimdall.local',
+            'password' => 'wachtwoord123',
+        ])
         ->call('authenticate')
-        ->assertHasFormErrors(['pin']);
+        ->assertHasFormErrors(['email']);
 
     expect(auth()->check())->toBeFalse();
 
-    Livewire::test(PinLogin::class)
-        ->fillForm(['pin' => '2222'])
+    // Active user with email + password succeeds
+    Livewire::test(AdminLogin::class)
+        ->fillForm([
+            'email' => 'admin@heimdall.local',
+            'password' => 'heimdall-admin',
+        ])
         ->call('authenticate')
         ->assertHasNoFormErrors()
         ->assertRedirect('/admin');
 
     expect(auth()->check())->toBeTrue()
-        ->and(auth()->user()->name)->toBe('Beheerder PIN');
+        ->and(auth()->user()->email)->toBe('admin@heimdall.local');
 });
 
-test('T44: Kiosk Hub has no Settings/Admin link, last admin PIN is protected, and PIN entry pages enforce throttling', function (): void {
+test('T44: Kiosk Hub has no Settings/Admin link, AdminLogin throttles failed attempts, and /entry enforces route throttling', function (): void {
     Setting::setMany([
         'max_failed_attempts' => 3,
         'lockout_seconds' => 60,
     ]);
-
-    $guestPin = PinCode::query()->create([
-        'name' => 'Schoonmaak',
-        'pin' => '3333',
-        'is_active' => true,
-        'is_admin' => false,
-    ]);
-
-    $adminPin = PinCode::query()->create([
-        'name' => 'Hoofdbeheerder',
-        'pin' => '4444',
-        'is_active' => true,
-        'is_admin' => true,
-    ]);
-
-    // Cannot uncheck is_admin or delete the last active admin PIN
-    expect(fn () => $adminPin->update(['is_admin' => false]))->toThrow(ValidationException::class);
-    expect(fn () => $adminPin->delete())->toThrow(ValidationException::class);
-    expect($guestPin->is_admin)->toBeFalse();
 
     // HubScreen has no Instellingen button or /admin link
     Livewire::test(HubScreen::class)
         ->assertDontSee('INSTELLINGEN')
         ->assertDontSeeHtml('href="/admin"');
 
-    // PinLogin throttles after max_failed_attempts (3) and blocks even valid PIN while locked out
+    // AdminLogin throttles after max_failed_attempts (3) and blocks even valid credentials while locked out
     for ($i = 0; $i < 3; $i++) {
-        Livewire::test(PinLogin::class)
-            ->fillForm(['pin' => '9999'])
+        Livewire::test(AdminLogin::class)
+            ->fillForm([
+                'email' => 'admin@heimdall.local',
+                'password' => 'verkeerd',
+            ])
             ->call('authenticate')
-            ->assertHasFormErrors(['pin']);
+            ->assertHasFormErrors(['email']);
     }
 
-    Livewire::test(PinLogin::class)
-        ->fillForm(['pin' => '4444'])
+    Livewire::test(AdminLogin::class)
+        ->fillForm([
+            'email' => 'admin@heimdall.local',
+            'password' => 'heimdall-admin',
+        ])
         ->call('authenticate')
-        ->assertHasFormErrors(['pin']);
+        ->assertHasFormErrors(['email']);
 
     expect(auth()->check())->toBeFalse();
 
@@ -292,16 +371,12 @@ test('T46: Admin session logs out immediately when returning to Kiosk and expire
         '*' => Http::response([], 200),
     ]);
 
-    $adminPin = PinCode::query()->create([
-        'name' => 'Deur Admin',
-        'pin' => '5555',
-        'is_active' => true,
-        'is_admin' => true,
-    ]);
-
-    // 1. Login via PIN and verify /admin access works
-    Livewire::test(PinLogin::class)
-        ->fillForm(['pin' => '5555'])
+    // 1. Login via email + password and verify /admin access works
+    Livewire::test(AdminLogin::class)
+        ->fillForm([
+            'email' => 'admin@heimdall.local',
+            'password' => 'heimdall-admin',
+        ])
         ->call('authenticate')
         ->assertRedirect('/admin');
 
@@ -318,9 +393,12 @@ test('T46: Admin session logs out immediately when returning to Kiosk and expire
 
     $this->get('/admin')->assertRedirect('/admin/login');
 
-    // 3. Log in again via PIN and test 60-second server-side idle timeout
-    Livewire::test(PinLogin::class)
-        ->fillForm(['pin' => '5555'])
+    // 3. Log in again and test 60-second server-side idle timeout
+    Livewire::test(AdminLogin::class)
+        ->fillForm([
+            'email' => 'admin@heimdall.local',
+            'password' => 'heimdall-admin',
+        ])
         ->call('authenticate')
         ->assertRedirect('/admin');
 
@@ -335,4 +413,70 @@ test('T46: Admin session logs out immediately when returning to Kiosk and expire
     $this->travel(61)->seconds();
     $this->get('/admin')->assertRedirect('/admin/login');
     expect(auth()->check())->toBeFalse();
+});
+
+test('T47: Fresh start redirects /admin/login to /admin/setup, creates first admin with optional PIN, and locks /admin/setup afterwards', function (): void {
+    // When an active admin already exists, /admin/setup is inaccessible and redirects to /admin/login
+    $this->get('/admin/setup')
+        ->assertRedirect('/admin/login');
+
+    // Simulate a fresh empty database without any users
+    DB::table('users')->delete();
+    expect(User::needsInitialAdminSetup())->toBeTrue();
+
+    // Visiting /admin/login on a fresh start automatically redirects to /admin/setup
+    $this->get('/admin/login')
+        ->assertRedirect('/admin/setup');
+
+    $this->get('/admin/setup')
+        ->assertOk()
+        ->assertSee('Welkom bij Heimdall Beheer');
+
+    // Validation catches mismatched password confirmation and invalid PIN format
+    Livewire::test(InitialAdminSetup::class)
+        ->fillForm([
+            'name' => 'Matthijs',
+            'email' => 'matthijs@voorbeeld.nl',
+            'password' => 'wachtwoord123',
+            'passwordConfirmation' => 'anders123',
+            'pin' => '12ab',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['password', 'pin']);
+
+    expect(User::query()->count())->toBe(0);
+
+    // Valid submission creates the first admin + optional panel PIN and logs in immediately
+    Livewire::test(InitialAdminSetup::class)
+        ->fillForm([
+            'name' => 'Matthijs',
+            'email' => 'matthijs@voorbeeld.nl',
+            'password' => 'wachtwoord123',
+            'passwordConfirmation' => 'wachtwoord123',
+            'pin' => '1357',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors()
+        ->assertRedirect('/admin');
+
+    expect(auth()->check())->toBeTrue();
+
+    $created = User::query()->where('email', 'matthijs@voorbeeld.nl')->first();
+    expect($created)->not->toBeNull()
+        ->and($created->is_active)->toBeTrue()
+        ->and($created->is_admin)->toBeTrue()
+        ->and(Hash::check('wachtwoord123', $created->password))->toBeTrue()
+        ->and(User::verifyPin('1357')?->id)->toBe($created->id)
+        ->and(User::needsInitialAdminSetup())->toBeFalse();
+
+    // Once logged out, /admin/setup is permanently locked and redirects back to /admin/login
+    auth()->logout();
+
+    $this->get('/admin/setup')
+        ->assertRedirect('/admin/login');
+
+    Livewire::test(InitialAdminSetup::class)
+        ->assertRedirect('/admin/login');
+
+    expect(User::query()->count())->toBe(1);
 });

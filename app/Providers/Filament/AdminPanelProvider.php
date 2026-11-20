@@ -2,7 +2,8 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\Auth\PinLogin;
+use App\Filament\Pages\Auth\AdminLogin;
+use App\Filament\Pages\Auth\InitialAdminSetup;
 use App\Filament\Widgets\HeimdallOverviewWidget;
 use App\Filament\Widgets\LatestActivityLogsWidget;
 use App\Http\Middleware\EnforceAdminIdleTimeout;
@@ -22,6 +23,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\HtmlString;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
@@ -36,7 +38,10 @@ class AdminPanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandName('Heimdall Beheer')
             ->defaultThemeMode(ThemeMode::Dark)
-            ->login(PinLogin::class)
+            ->login(AdminLogin::class)
+            ->routes(function (): void {
+                Route::get('/setup', InitialAdminSetup::class)->name('auth.setup');
+            })
             ->colors([
                 'primary' => Color::Teal,
             ])

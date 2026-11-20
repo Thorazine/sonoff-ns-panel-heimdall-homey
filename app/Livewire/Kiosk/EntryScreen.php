@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Kiosk;
 
-use App\Models\PinCode;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\HomeyService;
 use App\Services\PinLockoutService;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -95,7 +95,7 @@ class EntryScreen extends Component
             return;
         }
 
-        $verified = PinCode::verify($pin);
+        $verified = User::verifyPin($pin);
 
         if ($verified === null) {
             $contextLabel = $this->isArming() ? "inschakelen ({$this->mode})" : 'uitschakelen';

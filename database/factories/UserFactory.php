@@ -29,6 +29,10 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'is_active' => true,
+            'is_admin' => true,
+            'pin_hash' => null,
+            'pin_last_used_at' => null,
             'remember_token' => Str::random(10),
         ];
     }
@@ -38,8 +42,43 @@ class UserFactory extends Factory
      */
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn (array $attributes): array => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Attach a hashed panel PIN code to the user.
+     */
+    public function withPin(string $pin = '1234'): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'pin_hash' => Hash::make($pin),
+        ]);
+    }
+
+    /**
+     * Configure a panel-only user without /admin login access.
+     */
+    public function panelOnly(string $pin = '1234'): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'email' => null,
+            'email_verified_at' => null,
+            'password' => null,
+            'is_admin' => false,
+            'pin_hash' => Hash::make($pin),
+            'remember_token' => null,
+        ]);
+    }
+
+    /**
+     * Configure an inactive user.
+     */
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'is_active' => false,
         ]);
     }
 }

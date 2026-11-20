@@ -3,8 +3,8 @@
 use App\Livewire\Kiosk\CountdownScreen;
 use App\Livewire\Kiosk\EntryScreen;
 use App\Models\ActivityLog;
-use App\Models\PinCode;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\PinLockoutService;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -21,10 +21,8 @@ beforeEach(function (): void {
         'lockout_seconds' => 60,
     ]);
 
-    PinCode::query()->create([
+    User::factory()->panelOnly('1234')->create([
         'name' => 'Hoofd PIN',
-        'pin' => '1234',
-        'is_active' => true,
     ]);
 });
 
