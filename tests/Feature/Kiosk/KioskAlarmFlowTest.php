@@ -95,10 +95,10 @@ test('T33: EntryScreen logs wrong PIN attempts and activates GEBLOKKEERD lockout
 });
 
 test('T34: CountdownScreen blocks unauthorized direct access, arms Homey on completion, and clears auth on cancel', function (): void {
-    // Unauthorized direct access -> redirected to /menu
+    // Unauthorized direct access -> redirected to /alarm-mode
     Livewire::withQueryParams(['mode' => 'armed'])
         ->test(CountdownScreen::class)
-        ->assertRedirect('/menu');
+        ->assertRedirect('/alarm-mode');
 
     Http::fake([
         'http://192.168.1.50/api/manager/devices/device' => Http::response([
@@ -134,7 +134,7 @@ test('T34: CountdownScreen blocks unauthorized direct access, arms Homey on comp
     Livewire::withQueryParams(['mode' => 'armed'])
         ->test(CountdownScreen::class)
         ->call('cancel')
-        ->assertRedirect('/menu');
+        ->assertRedirect('/alarm-mode');
 
     expect(session()->has('kiosk.verified_arm'))->toBeFalse();
 });

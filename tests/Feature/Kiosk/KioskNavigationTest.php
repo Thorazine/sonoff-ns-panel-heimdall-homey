@@ -75,7 +75,7 @@ test('T25: StartScreen shows setup prompt pointing to /admin when Homey is not c
         ->assertSee('/admin');
 });
 
-test('T26: HubScreen Alarm tile routes to /menu when disarmed and /entry when armed', function (): void {
+test('T26: HubScreen Alarm tile routes to /alarm-mode when disarmed and /entry when armed', function (): void {
     Http::fakeSequence()
         ->push(['hd' => ['driverId' => 'surveillancemodeswitch']], 200)
         ->push(['capabilitiesObj' => ['homealarm_state' => ['value' => 'disarmed']]], 200)
@@ -84,7 +84,7 @@ test('T26: HubScreen Alarm tile routes to /menu when disarmed and /entry when ar
 
     Livewire::test(HubScreen::class)
         ->call('openAlarm')
-        ->assertRedirect('/menu');
+        ->assertRedirect('/alarm-mode');
 
     Livewire::test(HubScreen::class)
         ->call('openAlarm')

@@ -12,7 +12,7 @@ class EnforceAdminIdleTimeout
 {
     public const SESSION_KEY = 'admin.last_activity_at';
 
-    public const TIMEOUT_SECONDS = 60;
+    public const TIMEOUT_SECONDS = 7200;
 
     /**
      * Handle an incoming request.

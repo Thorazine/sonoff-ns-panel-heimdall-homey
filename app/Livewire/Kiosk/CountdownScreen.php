@@ -23,7 +23,7 @@ class CountdownScreen extends Component
     public function mount(): void
     {
         if (! $this->hasValidArmAuthorization()) {
-            $this->redirect('/menu', navigate: true);
+            $this->redirect('/alarm-mode', navigate: true);
 
             return;
         }
@@ -50,7 +50,7 @@ class CountdownScreen extends Component
     public function completeArming(): void
     {
         if (! $this->hasValidArmAuthorization()) {
-            $this->redirect('/menu', navigate: true);
+            $this->redirect('/alarm-mode', navigate: true);
 
             return;
         }
@@ -67,7 +67,7 @@ class CountdownScreen extends Component
     public function cancel(): void
     {
         session()->forget('kiosk.verified_arm');
-        $this->redirect('/menu', navigate: true);
+        $this->redirect('/alarm-mode', navigate: true);
     }
 
     public function render()

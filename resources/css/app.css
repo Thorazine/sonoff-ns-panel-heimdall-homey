@@ -35,6 +35,24 @@ html.wall-panel-no-zoom .wall-panel-scroll * {
     outline-offset: 2px;
 }
 
+.visually-hidden:where(:not(:focus-within, :active)) {
+    position: absolute !important;
+    clip-path: inset(50%) !important;
+    overflow: hidden !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: -1px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    white-space: nowrap !important;
+}
+
+.network-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr));
+    gap: 1.25rem;
+}
+
 dialog:modal {
     overscroll-behavior: contain;
 }

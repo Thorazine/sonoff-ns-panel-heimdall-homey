@@ -80,7 +80,7 @@ class HubScreen extends Component
         }
 
         if ($status === 'disarmed') {
-            $this->redirect($this->moduleUrl('/menu', $fromMenu), navigate: true);
+            $this->redirect($this->moduleUrl('/alarm-mode', $fromMenu), navigate: true);
 
             return;
         }

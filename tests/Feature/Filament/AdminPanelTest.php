@@ -272,7 +272,7 @@ test('T42: Vite manifest exists and all Kiosk HTTP routes render compiled assets
 
     expect(file_exists(public_path('build/manifest.json')))->toBeTrue();
 
-    foreach (['/', '/hub', '/gym', '/all-off', '/menu', '/entry'] as $uri) {
+    foreach (['/', '/hub', '/gym', '/all-off', '/alarm-mode', '/menu', '/entry'] as $uri) {
         $this->get($uri)
             ->assertOk()
             ->assertSeeHtml('/build/assets/');
@@ -366,7 +366,7 @@ test('T44: Kiosk Hub has no Settings/Admin link, AdminLogin throttles failed att
     $this->get('/entry')->assertTooManyRequests();
 });
 
-test('T46: Admin session logs out immediately when returning to Kiosk and expires after 60 seconds of inactivity', function (): void {
+test('T46: Admin session logs out immediately when returning to Kiosk and expires after 2 hours of inactivity', function (): void {
     Http::fake([
         '*' => Http::response([], 200),
     ]);
@@ -393,7 +393,7 @@ test('T46: Admin session logs out immediately when returning to Kiosk and expire
 
     $this->get('/admin')->assertRedirect('/admin/login');
 
-    // 3. Log in again and test 60-second server-side idle timeout
+    // 3. Log in again and test 2-hour (7200s) server-side idle timeout
     Livewire::test(AdminLogin::class)
         ->fillForm([
             'email' => 'admin@heimdall.local',
@@ -404,13 +404,18 @@ test('T46: Admin session logs out immediately when returning to Kiosk and expire
 
     $this->get('/admin')->assertOk();
 
-    // Activity at 30 seconds keeps session alive
-    $this->travel(30)->seconds();
+    // Activity at 90 minutes keeps session alive and resets the 2-hour timer
+    $this->travel(90)->minutes();
     $this->get('/admin')->assertOk();
     expect(auth()->check())->toBeTrue();
 
-    // 61 seconds without activity logs out and redirects to /admin/login
-    $this->travel(61)->seconds();
+    // Another 90 minutes (total 3 hours since login, 90 min since last activity) still keeps session alive
+    $this->travel(90)->minutes();
+    $this->get('/admin')->assertOk();
+    expect(auth()->check())->toBeTrue();
+
+    // 121 minutes without activity logs out and redirects to /admin/login
+    $this->travel(121)->minutes();
     $this->get('/admin')->assertRedirect('/admin/login');
     expect(auth()->check())->toBeFalse();
 });
